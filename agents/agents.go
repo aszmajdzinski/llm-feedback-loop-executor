@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -8,17 +9,23 @@ import (
 )
 
 type Agent struct {
-	name         string
-	llm          llm.LlmProvider
-	systemPrompt string
+	Name         string
+	SystemPrompt string
+	Model        string
+	Llm          llm.LlmProvider
 }
 
-func (a Agent) Chat(msg string) (string, error) {
-	ans, err := a.llm.GetCompletion(msg)
+func (a Agent) Chat(ctx context.Context, msg string) (string, error) {
+	s := llm.ChatMessage{Role: "developer", Content: a.SystemPrompt}
+	m := llm.ChatMessage{Role: "user", Content: msg}
+
+	ans, err := a.Llm.GetCompletion(ctx, llm.ChatRequest{Model: a.Model, Messages: []llm.ChatMessage{s, m}})
 	if err != nil {
 		return "", err
 	}
-	return ans, nil
+	// TODO: add logger
+
+	return ans.Content, nil
 }
 
 type ExpertsTeam struct {
@@ -30,24 +37,24 @@ type ExpertAnswer struct {
 	Error  error
 }
 
-func (e *ExpertsTeam) Ask(msg string) []ExpertAnswer {
+func (et *ExpertsTeam) Ask(ctx context.Context, msg string) []ExpertAnswer {
 	type result struct {
 		index  int
 		answer string
 		error  error
 	}
 
-	ch := make(chan result, len(e.Experts))
+	ch := make(chan result, len(et.Experts))
 	var wg sync.WaitGroup
 
-	for i, a := range e.Experts {
+	for i, a := range et.Experts {
 		wg.Add(1)
 
 		go func(index int, agent Agent) {
 			defer wg.Done()
-			ans, err := agent.Chat(msg)
+			ans, err := agent.Chat(ctx, msg)
 			if err != nil {
-				ch <- result{index: index, error: fmt.Errorf("cannot get response from agent %s: %w", agent.name, err)}
+				ch <- result{index: index, error: fmt.Errorf("cannot get response from agent %s: %w", agent.Name, err)}
 				return
 			}
 
@@ -58,7 +65,7 @@ func (e *ExpertsTeam) Ask(msg string) []ExpertAnswer {
 	wg.Wait()
 	close(ch)
 
-	answers := make([]ExpertAnswer, len(e.Experts))
+	answers := make([]ExpertAnswer, len(et.Experts))
 
 	for res := range ch {
 		answers[res.index] = ExpertAnswer{
