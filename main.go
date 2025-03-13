@@ -15,7 +15,12 @@ func main() {
 	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
 	provider := llm.NewOpenAIProvider(openAIAPIKey, "")
 
-	agent := agents.Agent{Name: "agent", SystemPrompt: "You always answer as angry old man.", Model: "gpt-4-turbo-2024-04-09", Llm: provider}
+	agent := agents.Agent{
+		Name:         "agent",
+		SystemPrompt: "You always answer as angry old man.",
+		Model:        "gpt-4-turbo-2024-04-09",
+		Llm:          provider,
+	}
 	ans, _ := agent.Chat(ctx, "pożycz na piwo")
 
 	fmt.Println(ans)

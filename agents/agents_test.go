@@ -15,13 +15,21 @@ type MockLlmProvider struct {
 	err      error
 }
 
-func (m *MockLlmProvider) GetCompletion(_ context.Context, _ llm.ChatRequest) (llm.ChatResponse, error) {
+func (m *MockLlmProvider) GetCompletion(
+	_ context.Context,
+	_ llm.ChatRequest,
+) (llm.ChatResponse, error) {
 	return llm.ChatResponse{Content: m.response}, m.err
 }
 
 func TestAgent_ChatOk(t *testing.T) {
 	mockLlm := &MockLlmProvider{response: "mock response", err: nil}
-	agent := Agent{Name: "test-agent", Llm: mockLlm, SystemPrompt: "test system prompt", Model: "test-model"}
+	agent := Agent{
+		Name:         "test-agent",
+		Llm:          mockLlm,
+		SystemPrompt: "test system prompt",
+		Model:        "test-model",
+	}
 
 	t.Run("successful chat", func(t *testing.T) {
 		response, err := agent.Chat(context.Background(), "prompt")
@@ -32,7 +40,12 @@ func TestAgent_ChatOk(t *testing.T) {
 
 func TestAgent_ChatError(t *testing.T) {
 	mockLlm := &MockLlmProvider{response: "", err: errors.New("provider error")}
-	agent := Agent{Name: "test-agent", Llm: mockLlm, SystemPrompt: "test system prompt", Model: "test-model"}
+	agent := Agent{
+		Name:         "test-agent",
+		Llm:          mockLlm,
+		SystemPrompt: "test system prompt",
+		Model:        "test-model",
+	}
 
 	t.Run("chat with error", func(t *testing.T) {
 		response, err := agent.Chat(context.Background(), "prompt")

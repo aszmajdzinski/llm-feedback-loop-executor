@@ -32,7 +32,10 @@ func (et *ExpertsTeam) Ask(ctx context.Context, msg string) []ExpertAnswer {
 			defer wg.Done()
 			ans, err := agent.Chat(ctx, msg)
 			if err != nil {
-				ch <- result{index: index, error: fmt.Errorf("cannot get response from agent %s: %w", agent.Name, err)}
+				ch <- result{
+					index: index,
+					error: fmt.Errorf("cannot get response from agent %s: %w", agent.Name, err),
+				}
 				return
 			}
 

@@ -47,7 +47,11 @@ func (o *OpenAIProvider) GetCompletion(ctx context.Context, req ChatRequest) (Ch
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return ChatResponse{}, fmt.Errorf("non-200 status code: %d; body: %s", resp.StatusCode, string(body))
+		return ChatResponse{}, fmt.Errorf(
+			"non-200 status code: %d; body: %s",
+			resp.StatusCode,
+			string(body),
+		)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
