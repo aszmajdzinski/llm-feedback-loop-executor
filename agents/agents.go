@@ -24,7 +24,6 @@ func (a Agent) Chat(ctx context.Context, msg string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO: add logger
 
 	return ans.Content, nil
 }

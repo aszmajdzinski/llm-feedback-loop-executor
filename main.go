@@ -11,6 +11,7 @@ import (
 
 	"example.com/web-app-creator/agents"
 	"example.com/web-app-creator/llm"
+	loggerutils "example.com/web-app-creator/logger_utils"
 	thinkingblock "example.com/web-app-creator/thinking_block"
 	_ "github.com/joho/godotenv/autoload"
 	"gopkg.in/yaml.v3"
@@ -39,7 +40,9 @@ type Block struct {
 }
 
 func main() {
+	logger := loggerutils.SetupLogger()
 	ctx := context.TODO()
+	ctx = loggerutils.WithLogger(ctx, logger)
 
 	data, err := os.ReadFile("system_prompts.yaml")
 	if err != nil {
@@ -75,10 +78,9 @@ func main() {
 		}
 
 		oracle := agents.Agent{
-			Name:         b.Oracle.Name,
-			SystemPrompt: b.Oracle.System,
-			Model:        "gpt-4o-mini",
-			Llm:          provider,
+			Name:  b.Oracle.Name,
+			Model: "gpt-4o-mini",
+			Llm:   provider,
 		}
 
 		thinkingBlock := thinkingblock.ThinkingBlock{
@@ -89,25 +91,23 @@ func main() {
 
 		ans, err := thinkingBlock.Run(ctx, string(b.Worker.Prompt), b.Iterations)
 		if err != nil {
-			log.Fatal(err)
+			logger.Error(fmt.Sprintf("error running thinking block: %v", err.Error()))
 		}
 
 		out := os.Getenv("OUTPUT_DIRECTORY")
 		createOutputDirectory(out)
-		for pan, pa := range ans.PartAnswers {
-			fileName := createTxtFilename(out, bn, b.Name, pan, b.Worker.Name)
+		for paIdx, pa := range ans.PartAnswers {
+			fileName := createTxtFilename(out, bn, b.Name, paIdx, b.Worker.Name)
 			_ = writeToFile(fileName, pa.WorkerSolution)
 
 			for ean, ea := range pa.ExpertAnswers {
-				fileName := createTxtFilename(out, bn, b.Name, pan, b.Experts[ean].Name)
+				fileName := createTxtFilename(out, bn, b.Name, paIdx, b.Experts[ean].Name)
 				_ = writeToFile(fileName, ea)
 			}
 
-			fileName = createTxtFilename(out, bn, b.Name, pan, b.Oracle.Name)
+			fileName = createTxtFilename(out, bn, b.Name, paIdx, b.Oracle.Name)
 			_ = writeToFile(fileName, pa.OracleSummary)
 		}
-		fmt.Println(len(ans.PartAnswers))
-
 	}
 }
 
@@ -133,7 +133,7 @@ func createOutputDirectory(path string) error {
 		}
 	}
 
-	return os.Mkdir(outputDir, 0755)
+	return os.Mkdir(outputDir, 0o755)
 }
 
 func writeToFile(fileName string, content string) error {
@@ -151,6 +151,15 @@ func writeToFile(fileName string, content string) error {
 	return nil
 }
 
-func createTxtFilename(directory string, blockNumber int, blockName string, iteration int, name string) string {
-	return filepath.Join(directory, toKebabCase(fmt.Sprintf("%03d %s %03d %s.txt", blockNumber, blockName, iteration, name)))
+func createTxtFilename(
+	directory string,
+	blockNumber int,
+	blockName string,
+	iteration int,
+	name string,
+) string {
+	return filepath.Join(
+		directory,
+		toKebabCase(fmt.Sprintf("%03d %s %03d %s.txt", blockNumber, blockName, iteration, name)),
+	)
 }

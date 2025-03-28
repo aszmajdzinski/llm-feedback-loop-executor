@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	loggerutils "example.com/web-app-creator/logger_utils"
 )
 
 type HTTPClient interface {
@@ -21,6 +23,7 @@ type OpenAIProvider struct {
 }
 
 func (o *OpenAIProvider) GetCompletion(ctx context.Context, req ChatRequest) (ChatResponse, error) {
+	logger := loggerutils.GetLogger(ctx)
 	startTime := time.Now()
 
 	requestBody, err := json.Marshal(req)
@@ -40,7 +43,17 @@ func (o *OpenAIProvider) GetCompletion(ctx context.Context, req ChatRequest) (Ch
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 
-	resp, err := o.httpClient.Do(httpReq)
+	logger.Info("Sending request", "URL", httpReq.URL.String())
+	var resp *http.Response
+	retryCount := 3
+	for i := range retryCount {
+		resp, err = o.httpClient.Do(httpReq)
+		if err == nil {
+			break
+		}
+		logger.Warn("Sequest failed, retrying...", "attempt", i+1, "error", err)
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
 		return ChatResponse{}, fmt.Errorf("error sending request: %w", err)
 	}

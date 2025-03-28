@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"example.com/web-app-creator/agents"
+	loggerutils "example.com/web-app-creator/logger_utils"
 )
 
 const initialWorkerPrompt string = "You will be given a TASK. " +
@@ -49,6 +50,7 @@ func (tb *ThinkingBlock) Run(
 	taskDescription string,
 	iterations int,
 ) (ThinkingBlockAnswer, error) {
+	logger := loggerutils.GetLogger(ctx)
 	blockAnswer := ThinkingBlockAnswer{}
 
 	for i := range iterations {
@@ -84,7 +86,8 @@ func (tb *ThinkingBlock) Run(
 		var reviews string
 		for i, ea := range expertsAnswers {
 			if ea.Error != nil {
-				return ThinkingBlockAnswer{}, fmt.Errorf("error chatting with expert %w", err)
+				logger.Error("error chatting with expert", "error", ea.Error)
+				continue
 			}
 
 			reviews += fmt.Sprintf("<SOLUTION %d> %s \n", i, ea.Answer)

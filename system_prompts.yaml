@@ -1,6 +1,6 @@
 blocks:
   - name: cardGameCreator
-    iterations: 10
+    iterations: 3
     worker:
       name: Worker
       system: >
