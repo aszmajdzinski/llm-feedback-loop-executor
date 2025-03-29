@@ -61,7 +61,7 @@ func main() {
 	}
 
 	for bn, b := range appSetup.Blocks {
-		logger.Info("Running block", " name", b.Name)
+		logger.Info("Running block", "name", b.Name)
 		ans, err := RunBlock(ctx, b, providers)
 		if err != nil {
 			logger.Error("error running block", "block", b.Name, "error", err)
@@ -81,7 +81,12 @@ func main() {
 			os.Getenv("OUTPUT_DIRECTORY"),
 			toKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
 		)
-		SaveBlockAnswer(ctx, o, b, ans)
+
+		err = SaveBlockAnswer(ctx, o, b, ans)
+		if err != nil {
+			logger.Error("Error saving block answer", "block", b.Name, "error", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -89,7 +94,7 @@ func RunBlock(
 	ctx context.Context,
 	blockData Block,
 	providers map[string]llm.LlmProvider,
-) (thinkingblock.ThinkingBlockAnswer, error) {
+) (thinkingblock.ThinkingBlockOutput, error) {
 	provider := providers["openai"]
 
 	worker := agents.Agent{
@@ -122,57 +127,74 @@ func RunBlock(
 		Oracle:      oracle,
 	}
 
-	ans, err := thinkingBlock.Run(ctx, string(blockData.Worker.Prompt), blockData.Iterations)
+	out, err := thinkingBlock.Run(ctx, string(blockData.Worker.Prompt), blockData.Iterations)
 	if err != nil {
-		return thinkingblock.ThinkingBlockAnswer{}, fmt.Errorf(
+		return thinkingblock.ThinkingBlockOutput{}, fmt.Errorf(
 			"error running thinking block: %v",
 			err.Error(),
 		)
 	}
 
-	return ans, nil
+	return out, nil
 }
 
 func SaveBlockAnswer(
 	ctx context.Context,
 	outputDir string,
 	blockData Block,
-	answer thinkingblock.ThinkingBlockAnswer,
-) {
+	answer thinkingblock.ThinkingBlockOutput,
+) error {
 	logger := loggerutils.GetLogger(ctx)
 	logger.Info("Saving answers", "block name", blockData.Name)
 
 	err := os.MkdirAll(outputDir, 0o755)
 	if err != nil {
-		logger.Error("error creating output directory", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	for paIdx, pa := range answer.PartAnswers {
-		fileName := createTxtFilename(outputDir, paIdx, blockData.Worker.Name)
-		logger.Debug("RunBlock: saving answer to", "file", fileName)
-
-		err := writeToFile(fileName, pa.WorkerSolution)
+		ansFileName := createTxtFilename(outputDir, paIdx, blockData.Worker.Name, "answer")
+		err := writeToFile(ansFileName, pa.WorkerSolution)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 
 		for ean, ea := range pa.ExpertAnswers {
-			fileName = createTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name)
-			logger.Debug("RunBlock: saving answer to", "file", fileName)
-			err = writeToFile(fileName, ea)
+			ansFileName = createTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name, "answer")
+			err = writeToFile(ansFileName, ea)
 			if err != nil {
 				logger.Error("error writing to file", "error", err)
 			}
 		}
 
-		fileName = createTxtFilename(outputDir, paIdx, blockData.Oracle.Name)
-		logger.Debug("RunBlock: saving answer to", "file", fileName)
-		err = writeToFile(fileName, pa.OracleSummary)
+		ansFileName = createTxtFilename(outputDir, paIdx, blockData.Oracle.Name, "answer")
+		err = writeToFile(ansFileName, pa.OracleSummary)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 	}
+
+	for pIdx, p := range answer.Prompts {
+		promptFileName := createTxtFilename(outputDir, pIdx, blockData.Worker.Name, "prompt")
+		err := writeToFile(promptFileName, p.WorkerPrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+
+		promptFileName = createTxtFilename(outputDir, pIdx, "experts", "prompt")
+		err = writeToFile(promptFileName, p.ExpertsPrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+
+		promptFileName = createTxtFilename(outputDir, pIdx, blockData.Oracle.Name, "prompt")
+		err = writeToFile(promptFileName, p.OraclePrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+	}
+
+	return nil
 }
 
 func toKebabCase(input string) string {
@@ -203,6 +225,9 @@ func writeToFile(fileName string, content string) error {
 	return nil
 }
 
-func createTxtFilename(directory string, iteration int, name string) string {
-	return filepath.Join(directory, toKebabCase(fmt.Sprintf("%03d %s.txt", iteration, name)))
+func createTxtFilename(directory string, iteration int, name string, suffix string) string {
+	return filepath.Join(
+		directory,
+		toKebabCase(fmt.Sprintf("%03d %s %s.txt", iteration, name, suffix)),
+	)
 }

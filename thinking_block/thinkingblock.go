@@ -22,21 +22,28 @@ const oraclePrompt string = "You will be given a SOLUTION and its REVIEWS. " +
 	"highlighting strengths, weaknesses, and suggestions for improvement. " +
 	"Provide a concise and clear summary. Do not overthink, if you see that" +
 	"those reviews are enough, then simply answer OK, without any other characters." +
-	"Solution will start with <SOLUTION number>."
+	"Review will start with <REVIEW number>."
 
 const workerPromptWithSummary string = "You will be given a TASK, a SOLUTION and a SUMMARY of feedback from experts. " +
 	"Your job is to refine the SOLUTION based on the feedback provided. " +
 	"Ensure that the final solution is accurate, complete, and incorporates all the improvements suggested by the experts."
 
-type ThinkingBlockAnswer struct {
-	PartAnswers []PartAnswer
+type ThinkingBlockOutput struct {
+	Prompts     []Prompts
+	PartAnswers []PartialAnswer
 	FinalAnswer string
 }
 
-type PartAnswer struct {
+type PartialAnswer struct {
 	WorkerSolution string
 	ExpertAnswers  []string
 	OracleSummary  string
+}
+
+type Prompts struct {
+	WorkerPrompt  string
+	ExpertsPrompt string
+	OraclePrompt  string
 }
 
 type ThinkingBlock struct {
@@ -49,42 +56,45 @@ func (tb *ThinkingBlock) Run(
 	ctx context.Context,
 	taskDescription string,
 	iterations int,
-) (ThinkingBlockAnswer, error) {
+) (ThinkingBlockOutput, error) {
 	logger := loggerutils.GetLogger(ctx)
-	blockAnswer := ThinkingBlockAnswer{}
+	blockOutput := ThinkingBlockOutput{}
 
 	for i := range iterations {
 		logger.Debug("Thinking block: iteration", "number", i)
-		currentIterationAnswer := PartAnswer{}
+		currentIterationAnswer := PartialAnswer{}
+		currentIterationPrompts := Prompts{}
 
+		var wPrompt string
 		if i == 0 {
 			// 1a. If it is a first iteration, ask worker to provide solution
-			taskDescription = fmt.Sprintf("%s TASK: %s", initialWorkerPrompt, taskDescription)
+			wPrompt = fmt.Sprintf("%s\nTASK: %s\n", initialWorkerPrompt, taskDescription)
 		} else {
 			// 1. Else ask worker to refine solution
-			taskDescription = fmt.Sprintf(
-				"%s TASK: %s SOLUTION: %s SUMMARY: %s",
+			wPrompt = fmt.Sprintf(
+				"%s\nTASK: %s\nSOLUTION: %s\nSUMMARY: %s",
 				workerPromptWithSummary,
 				taskDescription,
-				blockAnswer.PartAnswers[i-1].WorkerSolution,
-				blockAnswer.PartAnswers[i-1].OracleSummary,
+				blockOutput.PartAnswers[i-1].WorkerSolution,
+				blockOutput.PartAnswers[i-1].OracleSummary,
 			)
 		}
 
 		// 2. Get worker solution proposal
-		solution, err := tb.Worker.Chat(ctx, taskDescription)
+		currentIterationPrompts.WorkerPrompt = wPrompt
+		solution, err := tb.Worker.Chat(ctx, wPrompt)
 		if err != nil {
-			return ThinkingBlockAnswer{}, fmt.Errorf("error chatting with worker %w", err)
+			return ThinkingBlockOutput{}, fmt.Errorf("error chatting with worker %w", err)
 		}
 		currentIterationAnswer.WorkerSolution = solution
 
 		// 3. Ask experts to review the proposal
+		eP := fmt.Sprintf("%s\nTASK: %s\nSOLUTION %s", expertPrompt, taskDescription, solution)
+		currentIterationPrompts.ExpertsPrompt = eP
 		expertsAnswers := tb.ExpertsTeam.Ask(
 			ctx,
-			fmt.Sprintf("%s TASK: %s SOLUTION %s", expertPrompt, taskDescription, solution),
+			eP,
 		)
-
-		logger.Debug("Thinking block: experts anwers", "count", len(expertsAnswers))
 
 		var reviews string
 		for i, ea := range expertsAnswers {
@@ -93,7 +103,7 @@ func (tb *ThinkingBlock) Run(
 				continue
 			}
 
-			reviews += fmt.Sprintf("<SOLUTION %d> %s \n", i, ea.Answer)
+			reviews += fmt.Sprintf("<REVIEW %d> %s\n", i, ea.Answer)
 			currentIterationAnswer.ExpertAnswers = append(
 				currentIterationAnswer.ExpertAnswers,
 				ea.Answer,
@@ -101,17 +111,19 @@ func (tb *ThinkingBlock) Run(
 		}
 
 		// 4. Provide those reviews to Oracle to sum up
+		oP := fmt.Sprintf("%s\nSOLUTION: %s\nREVIEWS: %s", oraclePrompt, solution, reviews)
 		summary, err := tb.Oracle.Chat(
 			ctx,
-			fmt.Sprintf("%s SOLUTION: %s REVIEWS: %s", oraclePrompt, solution, reviews),
+			oP,
 		)
 		if err != nil {
-			return ThinkingBlockAnswer{}, fmt.Errorf("error chatting with oracle %w", err)
+			return ThinkingBlockOutput{}, fmt.Errorf("error chatting with oracle %w", err)
 		}
-
 		currentIterationAnswer.OracleSummary = summary
+		currentIterationPrompts.OraclePrompt = oP
 
-		blockAnswer.PartAnswers = append(blockAnswer.PartAnswers, currentIterationAnswer)
+		blockOutput.PartAnswers = append(blockOutput.PartAnswers, currentIterationAnswer)
+		blockOutput.Prompts = append(blockOutput.Prompts, currentIterationPrompts)
 
 		if summary == "OK" {
 			logger.Debug("Thinking block: Oracle told OK")
@@ -119,7 +131,7 @@ func (tb *ThinkingBlock) Run(
 		}
 
 	}
-	blockAnswer.FinalAnswer = blockAnswer.PartAnswers[len(blockAnswer.PartAnswers)-1].WorkerSolution
+	blockOutput.FinalAnswer = blockOutput.PartAnswers[len(blockOutput.PartAnswers)-1].WorkerSolution
 
-	return blockAnswer, nil
+	return blockOutput, nil
 }
