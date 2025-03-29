@@ -43,7 +43,6 @@ func (o *OpenAIProvider) GetCompletion(ctx context.Context, req ChatRequest) (Ch
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 
-	logger.Info("Sending request", "URL", httpReq.URL.String())
 	var resp *http.Response
 	retryCount := 3
 	for i := range retryCount {
@@ -51,7 +50,7 @@ func (o *OpenAIProvider) GetCompletion(ctx context.Context, req ChatRequest) (Ch
 		if err == nil {
 			break
 		}
-		logger.Warn("Sequest failed, retrying...", "attempt", i+1, "error", err)
+		logger.Warn("Request failed, retrying...", "attempt", i+1, "error", err)
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {

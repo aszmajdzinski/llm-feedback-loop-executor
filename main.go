@@ -56,57 +56,121 @@ func main() {
 	}
 
 	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
-	provider := llm.NewOpenAIProvider(openAIAPIKey, "")
+	providers := map[string]llm.LlmProvider{
+		"openai": llm.NewOpenAIProvider(openAIAPIKey, ""),
+	}
 
 	for bn, b := range appSetup.Blocks {
-		worker := agents.Agent{
-			Name:         b.Worker.Name,
-			SystemPrompt: b.Worker.System,
+		logger.Info("Running block", " name", b.Name)
+		ans, err := RunBlock(ctx, b, providers)
+		if err != nil {
+			logger.Error("error running block", "block", b.Name, "error", err)
+			os.Exit(1)
+		}
+		logger.Debug(
+			"Finished running block",
+			"block name",
+			b.Name,
+			"part answers count",
+			len(ans.PartAnswers),
+			"final answer lenght",
+			len(ans.FinalAnswer),
+		)
+
+		o := filepath.Join(
+			os.Getenv("OUTPUT_DIRECTORY"),
+			toKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
+		)
+		SaveBlockAnswer(ctx, o, b, ans)
+	}
+}
+
+func RunBlock(
+	ctx context.Context,
+	blockData Block,
+	providers map[string]llm.LlmProvider,
+) (thinkingblock.ThinkingBlockAnswer, error) {
+	provider := providers["openai"]
+
+	worker := agents.Agent{
+		Name:         blockData.Worker.Name,
+		SystemPrompt: blockData.Worker.System,
+		Model:        "gpt-4o-mini",
+		Llm:          provider,
+	}
+
+	var experts []agents.Agent
+	for _, a := range blockData.Experts {
+		experts = append(experts, agents.Agent{
+			Name:         a.Name,
+			SystemPrompt: a.System,
 			Model:        "gpt-4o-mini",
 			Llm:          provider,
-		}
+		},
+		)
+	}
 
-		var experts []agents.Agent
-		for _, a := range b.Experts {
-			experts = append(experts, agents.Agent{
-				Name:         a.Name,
-				SystemPrompt: a.System,
-				Model:        "gpt-4o-mini",
-				Llm:          provider,
-			},
-			)
-		}
+	oracle := agents.Agent{
+		Name:  blockData.Oracle.Name,
+		Model: "gpt-4o-mini",
+		Llm:   provider,
+	}
 
-		oracle := agents.Agent{
-			Name:  b.Oracle.Name,
-			Model: "gpt-4o-mini",
-			Llm:   provider,
-		}
+	thinkingBlock := thinkingblock.ThinkingBlock{
+		Worker:      worker,
+		ExpertsTeam: agents.ExpertsTeam{Experts: experts},
+		Oracle:      oracle,
+	}
 
-		thinkingBlock := thinkingblock.ThinkingBlock{
-			Worker:      worker,
-			ExpertsTeam: agents.ExpertsTeam{Experts: experts},
-			Oracle:      oracle,
-		}
+	ans, err := thinkingBlock.Run(ctx, string(blockData.Worker.Prompt), blockData.Iterations)
+	if err != nil {
+		return thinkingblock.ThinkingBlockAnswer{}, fmt.Errorf(
+			"error running thinking block: %v",
+			err.Error(),
+		)
+	}
 
-		ans, err := thinkingBlock.Run(ctx, string(b.Worker.Prompt), b.Iterations)
+	return ans, nil
+}
+
+func SaveBlockAnswer(
+	ctx context.Context,
+	outputDir string,
+	blockData Block,
+	answer thinkingblock.ThinkingBlockAnswer,
+) {
+	logger := loggerutils.GetLogger(ctx)
+	logger.Info("Saving answers", "block name", blockData.Name)
+
+	err := os.MkdirAll(outputDir, 0o755)
+	if err != nil {
+		logger.Error("error creating output directory", "error", err)
+		os.Exit(1)
+	}
+
+	for paIdx, pa := range answer.PartAnswers {
+		fileName := createTxtFilename(outputDir, paIdx, blockData.Worker.Name)
+		logger.Debug("RunBlock: saving answer to", "file", fileName)
+
+		err := writeToFile(fileName, pa.WorkerSolution)
 		if err != nil {
-			logger.Error(fmt.Sprintf("error running thinking block: %v", err.Error()))
+			logger.Error("error writing to file", "error", err)
 		}
 
-		out := os.Getenv("OUTPUT_DIRECTORY")
-		createOutputDirectory(out)
-		for paIdx, pa := range ans.PartAnswers {
-			fileName := createTxtFilename(out, bn, b.Name, paIdx, b.Worker.Name)
-			_ = writeToFile(fileName, pa.WorkerSolution)
-
-			for ean, ea := range pa.ExpertAnswers {
-				fileName := createTxtFilename(out, bn, b.Name, paIdx, b.Experts[ean].Name)
-				_ = writeToFile(fileName, ea)
+		for ean, ea := range pa.ExpertAnswers {
+			fileName = createTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name)
+			logger.Debug("RunBlock: saving answer to", "file", fileName)
+			err = writeToFile(fileName, ea)
+			if err != nil {
+				logger.Error("error writing to file", "error", err)
 			}
+		}
 
-			fileName = createTxtFilename(out, bn, b.Name, paIdx, b.Oracle.Name)
-			_ = writeToFile(fileName, pa.OracleSummary)
+		fileName = createTxtFilename(outputDir, paIdx, blockData.Oracle.Name)
+		logger.Debug("RunBlock: saving answer to", "file", fileName)
+		err = writeToFile(fileName, pa.OracleSummary)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
 		}
 	}
 }
@@ -124,18 +188,6 @@ func toKebabCase(input string) string {
 	return builder.String()
 }
 
-func createOutputDirectory(path string) error {
-	outputDir := path
-	if _, err := os.Stat(outputDir); err == nil {
-		err = os.RemoveAll(outputDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	return os.Mkdir(outputDir, 0o755)
-}
-
 func writeToFile(fileName string, content string) error {
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -151,15 +203,6 @@ func writeToFile(fileName string, content string) error {
 	return nil
 }
 
-func createTxtFilename(
-	directory string,
-	blockNumber int,
-	blockName string,
-	iteration int,
-	name string,
-) string {
-	return filepath.Join(
-		directory,
-		toKebabCase(fmt.Sprintf("%03d %s %03d %s.txt", blockNumber, blockName, iteration, name)),
-	)
+func createTxtFilename(directory string, iteration int, name string) string {
+	return filepath.Join(directory, toKebabCase(fmt.Sprintf("%03d %s.txt", iteration, name)))
 }

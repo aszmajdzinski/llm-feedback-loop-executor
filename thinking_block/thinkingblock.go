@@ -54,6 +54,7 @@ func (tb *ThinkingBlock) Run(
 	blockAnswer := ThinkingBlockAnswer{}
 
 	for i := range iterations {
+		logger.Debug("Thinking block: iteration", "number", i)
 		currentIterationAnswer := PartAnswer{}
 
 		if i == 0 {
@@ -83,6 +84,8 @@ func (tb *ThinkingBlock) Run(
 			fmt.Sprintf("%s TASK: %s SOLUTION %s", expertPrompt, taskDescription, solution),
 		)
 
+		logger.Debug("Thinking block: experts anwers", "count", len(expertsAnswers))
+
 		var reviews string
 		for i, ea := range expertsAnswers {
 			if ea.Error != nil {
@@ -108,11 +111,13 @@ func (tb *ThinkingBlock) Run(
 
 		currentIterationAnswer.OracleSummary = summary
 
+		blockAnswer.PartAnswers = append(blockAnswer.PartAnswers, currentIterationAnswer)
+
 		if summary == "OK" {
+			logger.Debug("Thinking block: Oracle told OK")
 			break
 		}
 
-		blockAnswer.PartAnswers = append(blockAnswer.PartAnswers, currentIterationAnswer)
 	}
 	blockAnswer.FinalAnswer = blockAnswer.PartAnswers[len(blockAnswer.PartAnswers)-1].WorkerSolution
 
