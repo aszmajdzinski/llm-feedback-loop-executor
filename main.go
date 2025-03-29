@@ -6,10 +6,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-	"unicode"
 
 	"example.com/web-app-creator/agents"
+	fileutils "example.com/web-app-creator/file_utils"
 	"example.com/web-app-creator/llm"
 	loggerutils "example.com/web-app-creator/logger_utils"
 	thinkingblock "example.com/web-app-creator/thinking_block"
@@ -79,7 +78,7 @@ func main() {
 
 		o := filepath.Join(
 			os.Getenv("OUTPUT_DIRECTORY"),
-			toKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
+			fileutils.ToKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
 		)
 
 		err = SaveBlockAnswer(ctx, o, b, ans)
@@ -153,81 +152,46 @@ func SaveBlockAnswer(
 	}
 
 	for paIdx, pa := range answer.PartAnswers {
-		ansFileName := createTxtFilename(outputDir, paIdx, blockData.Worker.Name, "answer")
-		err := writeToFile(ansFileName, pa.WorkerSolution)
+		ansFileName := fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Worker.Name, "answer")
+		err := fileutils.WriteToFile(ansFileName, pa.WorkerSolution)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 
 		for ean, ea := range pa.ExpertAnswers {
-			ansFileName = createTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name, "answer")
-			err = writeToFile(ansFileName, ea)
+			ansFileName = fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name, "answer")
+			err = fileutils.WriteToFile(ansFileName, ea)
 			if err != nil {
 				logger.Error("error writing to file", "error", err)
 			}
 		}
 
-		ansFileName = createTxtFilename(outputDir, paIdx, blockData.Oracle.Name, "answer")
-		err = writeToFile(ansFileName, pa.OracleSummary)
+		ansFileName = fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Oracle.Name, "answer")
+		err = fileutils.WriteToFile(ansFileName, pa.OracleSummary)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 	}
 
 	for pIdx, p := range answer.Prompts {
-		promptFileName := createTxtFilename(outputDir, pIdx, blockData.Worker.Name, "prompt")
-		err := writeToFile(promptFileName, p.WorkerPrompt)
+		promptFileName := fileutils.CreateTxtFilename(outputDir, pIdx, blockData.Worker.Name, "prompt")
+		err := fileutils.WriteToFile(promptFileName, p.WorkerPrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 
-		promptFileName = createTxtFilename(outputDir, pIdx, "experts", "prompt")
-		err = writeToFile(promptFileName, p.ExpertsPrompt)
+		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, "experts", "prompt")
+		err = fileutils.WriteToFile(promptFileName, p.ExpertsPrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 
-		promptFileName = createTxtFilename(outputDir, pIdx, blockData.Oracle.Name, "prompt")
-		err = writeToFile(promptFileName, p.OraclePrompt)
+		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, blockData.Oracle.Name, "prompt")
+		err = fileutils.WriteToFile(promptFileName, p.OraclePrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 	}
 
 	return nil
-}
-
-func toKebabCase(input string) string {
-	var builder strings.Builder
-	for _, r := range input {
-		if r == ' ' {
-			builder.WriteRune('-')
-		} else {
-			builder.WriteRune(unicode.ToLower(r))
-		}
-	}
-
-	return builder.String()
-}
-
-func writeToFile(fileName string, content string) error {
-	file, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString(content)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func createTxtFilename(directory string, iteration int, name string, suffix string) string {
-	return filepath.Join(
-		directory,
-		toKebabCase(fmt.Sprintf("%03d %s %s.txt", iteration, name, suffix)),
-	)
 }
