@@ -31,3 +31,22 @@ blocks:
     oracle:
       name: Oracle
       system: ""
+
+  - name: storyTeller
+    iterations: 2
+    worker:
+      name: Worker
+      system: You are a novel writer. You specialise in short forms.
+      prompt: Create a two sentence story about a family that played a card game described after the
+        word DATA.
+
+    experts:
+      - name: whateverReviewer
+        system: You are a reviewer who totally don't care about own job. You barely read anything.
+
+      - name: veryCriticalReviewer
+        system: You are a very cirtical reivewer who pay attentions to details.
+
+    oracle:
+      name: Oracle
+      system: ""

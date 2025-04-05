@@ -59,9 +59,11 @@ func main() {
 		"openai": llm.NewOpenAIProvider(openAIAPIKey, ""),
 	}
 
+	previousBlockOutput := ""
 	for bn, b := range appSetup.Blocks {
 		logger.Info("Running block", "name", b.Name)
-		ans, err := RunBlock(ctx, b, providers)
+
+		ans, err := RunBlock(ctx, b, previousBlockOutput, providers)
 		if err != nil {
 			logger.Error("error running block", "block", b.Name, "error", err)
 			os.Exit(1)
@@ -86,12 +88,17 @@ func main() {
 			logger.Error("Error saving block answer", "block", b.Name, "error", err)
 			os.Exit(1)
 		}
+
+		previousBlockOutput = ans.FinalAnswer
 	}
+
+	fmt.Println(previousBlockOutput)
 }
 
 func RunBlock(
 	ctx context.Context,
 	blockData Block,
+	additionalData string,
 	providers map[string]llm.LlmProvider,
 ) (thinkingblock.ThinkingBlockOutput, error) {
 	provider := providers["openai"]
@@ -126,7 +133,12 @@ func RunBlock(
 		Oracle:      oracle,
 	}
 
-	out, err := thinkingBlock.Run(ctx, string(blockData.Worker.Prompt), blockData.Iterations)
+	out, err := thinkingBlock.Run(
+		ctx,
+		string(blockData.Worker.Prompt),
+		additionalData,
+		blockData.Iterations,
+	)
 	if err != nil {
 		return thinkingblock.ThinkingBlockOutput{}, fmt.Errorf(
 			"error running thinking block: %v",
@@ -152,14 +164,24 @@ func SaveBlockAnswer(
 	}
 
 	for paIdx, pa := range answer.PartAnswers {
-		ansFileName := fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Worker.Name, "answer")
+		ansFileName := fileutils.CreateTxtFilename(
+			outputDir,
+			paIdx,
+			blockData.Worker.Name,
+			"answer",
+		)
 		err := fileutils.WriteToFile(ansFileName, pa.WorkerSolution)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
 		}
 
 		for ean, ea := range pa.ExpertAnswers {
-			ansFileName = fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Experts[ean].Name, "answer")
+			ansFileName = fileutils.CreateTxtFilename(
+				outputDir,
+				paIdx,
+				blockData.Experts[ean].Name,
+				"answer",
+			)
 			err = fileutils.WriteToFile(ansFileName, ea)
 			if err != nil {
 				logger.Error("error writing to file", "error", err)
@@ -174,7 +196,12 @@ func SaveBlockAnswer(
 	}
 
 	for pIdx, p := range answer.Prompts {
-		promptFileName := fileutils.CreateTxtFilename(outputDir, pIdx, blockData.Worker.Name, "prompt")
+		promptFileName := fileutils.CreateTxtFilename(
+			outputDir,
+			pIdx,
+			blockData.Worker.Name,
+			"prompt",
+		)
 		err := fileutils.WriteToFile(promptFileName, p.WorkerPrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
@@ -186,7 +213,12 @@ func SaveBlockAnswer(
 			logger.Error("error writing to file", "error", err)
 		}
 
-		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, blockData.Oracle.Name, "prompt")
+		promptFileName = fileutils.CreateTxtFilename(
+			outputDir,
+			pIdx,
+			blockData.Oracle.Name,
+			"prompt",
+		)
 		err = fileutils.WriteToFile(promptFileName, p.OraclePrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
