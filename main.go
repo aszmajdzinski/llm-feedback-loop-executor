@@ -56,7 +56,7 @@ func main() {
 
 	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
 	providers := map[string]llm.LlmProvider{
-		"openai": llm.NewOpenAIProvider(openAIAPIKey, ""),
+		"openai": llm.NewOpenAIProvider(openAIAPIKey, "gpt-4o-mini", ""),
 	}
 
 	previousBlockOutput := ""
@@ -106,7 +106,6 @@ func RunBlock(
 	worker := agents.Agent{
 		Name:         blockData.Worker.Name,
 		SystemPrompt: blockData.Worker.System,
-		Model:        "gpt-4o-mini",
 		Llm:          provider,
 	}
 
@@ -115,16 +114,14 @@ func RunBlock(
 		experts = append(experts, agents.Agent{
 			Name:         a.Name,
 			SystemPrompt: a.System,
-			Model:        "gpt-4o-mini",
 			Llm:          provider,
 		},
 		)
 	}
 
 	oracle := agents.Agent{
-		Name:  blockData.Oracle.Name,
-		Model: "gpt-4o-mini",
-		Llm:   provider,
+		Name: blockData.Oracle.Name,
+		Llm:  provider,
 	}
 
 	thinkingBlock := thinkingblock.ThinkingBlock{
