@@ -74,6 +74,7 @@ func (tb *ThinkingBlock) Run(
 	ctx context.Context,
 	taskDescription string,
 	data string,
+	saveOutputFiles bool,
 	iterations int,
 ) (ThinkingBlockOutput, error) {
 	logger := loggerutils.GetLogger(ctx)
@@ -105,6 +106,12 @@ func (tb *ThinkingBlock) Run(
 		oPrompt = oraclePromptWithData
 	} else {
 		oPrompt = oraclePrompt
+	}
+
+	// use json schema for structured output or don't care about output format
+	var s *map[string]any
+	if saveOutputFiles {
+		s = &schema
 	}
 
 	for i := range iterations {
@@ -150,9 +157,10 @@ func (tb *ThinkingBlock) Run(
 
 		// 2. Chat with worker and get solution proposal
 		currentIterationPrompts.WorkerPrompt = wP
-		solution, err := tb.Worker.Chat(ctx, wP)
+		solution, err := chat(ctx, tb.Worker, wP, s)
+
 		if err != nil {
-			return ThinkingBlockOutput{}, fmt.Errorf("error chatting with worker %w", err)
+			return ThinkingBlockOutput{}, fmt.Errorf("error chatting with worker: %w", err)
 		}
 		currentIterationAnswer.WorkerSolution = solution
 
@@ -229,4 +237,39 @@ func (tb *ThinkingBlock) Run(
 	blockOutput.FinalAnswer = blockOutput.PartAnswers[len(blockOutput.PartAnswers)-1].WorkerSolution
 
 	return blockOutput, nil
+}
+
+var schema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"files": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"fileName": map[string]any{
+						"type":        "string",
+						"description": "File name",
+					},
+					"fileContent": map[string]any{
+						"type":        "string",
+						"description": "File content",
+					},
+				},
+				"required":             []string{"fileName", "fileContent"},
+				"additionalProperties": false,
+			},
+			"description": "Lista plików",
+		},
+	},
+	"required":             []string{"files"},
+	"additionalProperties": false,
+}
+
+func chat(ctx context.Context, agent agents.Agent, msg string, schema *map[string]any) (string, error) {
+	if schema != nil {
+		return agent.StructuredChat(ctx, msg, agent.Name, *schema)
+	} else {
+		return agent.Chat(ctx, msg)
+	}
 }

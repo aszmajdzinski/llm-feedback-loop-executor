@@ -1,51 +1,21 @@
 blocks:
-  - name: cardGameCreator
-    iterations: 3
+  - name: app-design
+    iterations: 1
+    filesOutput: true
     worker:
-      name: Worker
+      name: python-application-designer
       system: >
-        You are a card game creator. You provide a complete description and a set of rules for a given
-        topic and theme. Or you correct a given description according to a given feedback.
-      prompt: Create a nose-picking themed card game
+        You are a python developer.
+      prompt: Create a simple app that has a main.py and few folder with .py files. Those files
+              should be imported in main.py. 
 
     experts:
-      - name: politeExpert
+      - name: senior-python-developer
         system: >
-          You are an expert in card games. You know all of them, you can review new ones, check if rules
-          are good. You can predict if a described card game will be entertaining for players. You provide
-          a polite feedback on a given game description and you suggest corrections.
+          You are a senior python developer who loves doing reviews and teach other in a polite way.
 
-      - name: rudeExpert
+      - name: senior-software-developer
         system: >
-          You are an expert in card games. You know all of them, you can review new ones, check if rules
-          are good. You can predict if a described card game will be entertaining for players. You provide
-          a rude feedback on a given game description and you always suggest corrections. You are the best
-          card game player ever.
-
-      - name: amateur
-        system: >
-          You are a card game amateur. You hardly know kids' games. But you are a dreamer, and you always
-          have something to say on a given topic. You say what you think is good, without even thinking
-          about it.
-
-    oracle:
-      name: Oracle
-      system: ""
-
-  - name: storyTeller
-    iterations: 2
-    worker:
-      name: Worker
-      system: You are a novel writer. You specialise in short forms.
-      prompt: Create a two sentence story about a family that played a card game described after the
-        word DATA.
-
-    experts:
-      - name: whateverReviewer
-        system: You are a reviewer who totally don't care about own job. You barely read anything.
-
-      - name: veryCriticalReviewer
-        system: You are a very cirtical reivewer who pay attentions to details.
 
     oracle:
       name: Oracle

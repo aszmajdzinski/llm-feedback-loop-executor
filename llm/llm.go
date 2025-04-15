@@ -5,24 +5,33 @@ import (
 	"time"
 )
 
-type LlmProvider interface {
+type LLMProvider interface {
 	GetCompletion(context.Context, ChatRequest) (ChatResponse, error)
 }
 
-type StructuredOutputCapableLlmProvider interface {
-	LlmProvider
-	GetResponse(context.Context, ChatRequest) (ChatResponse, error)
+type StructuredLLMProvider interface {
+	LLMProvider
+	GetResponse(context.Context, StructuredChatRequest) (ChatResponse, error)
+}
+
+type BaseChatRequest struct {
+	Messages  []ChatMessage
+	MaxTokens int
 }
 
 type ChatRequest struct {
-	Messages   []ChatMessage
-	JSONSchema string
-	MaxTokens  int
+	BaseChatRequest
+}
+
+type StructuredChatRequest struct {
+	BaseChatRequest
+	Schema any
+	Name   string
 }
 
 type ChatMessage struct {
 	Role    string
-	Message string
+	Content string
 }
 
 type ChatResponse struct {

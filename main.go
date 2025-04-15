@@ -21,9 +21,10 @@ type AppSetup struct {
 }
 
 type Block struct {
-	Name       string `yaml:"name"`
-	Iterations int    `yaml:"iterations"`
-	Worker     struct {
+	Name        string `yaml:"name"`
+	Iterations  int    `yaml:"iterations"`
+	FilesOutput bool   `yaml:"filesOutput"`
+	Worker      struct {
 		Name   string `yaml:"name"`
 		System string `yaml:"system"`
 		Prompt string `yaml:"prompt"`
@@ -55,8 +56,8 @@ func main() {
 	}
 
 	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
-	providers := map[string]llm.LlmProvider{
-		"openai": llm.NewOpenAIProvider(openAIAPIKey, "gpt-4o-mini", ""),
+	providers := map[string]llm.LLMProvider{
+		"openai": llm.NewOpenAIWithStructuredOutputProvider(openAIAPIKey, "gpt-4o-mini", ""),
 	}
 
 	previousBlockOutput := ""
@@ -69,27 +70,36 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Debug(
-			"Finished running block",
-			"block name",
-			b.Name,
-			"part answers count",
-			len(ans.PartAnswers),
-			"final answer lenght",
-			len(ans.FinalAnswer),
-		)
+			"Finished running block", "block name", b.Name)
 
-		o := filepath.Join(
+		partialOutputsDir := filepath.Join(
 			os.Getenv("OUTPUT_DIRECTORY"),
+			"conversations",
 			fileutils.ToKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
 		)
 
-		err = SaveBlockAnswer(ctx, o, b, ans)
+		err = SaveBlockAnswer(ctx, partialOutputsDir, b, ans)
 		if err != nil {
 			logger.Error("Error saving block answer", "block", b.Name, "error", err)
 			os.Exit(1)
 		}
 
 		previousBlockOutput = ans.FinalAnswer
+
+		blockFinalAnswerDir := filepath.Join(
+			os.Getenv("OUTPUT_DIRECTORY"),
+			"answers",
+			fileutils.ToKebabCase(fmt.Sprintf("%03d %s", bn, b.Name)),
+		)
+
+		if b.FilesOutput {
+			err = os.MkdirAll(blockFinalAnswerDir, 0o755)
+			if err != nil {
+				logger.Error("Error creating block answer directory", "error", err)
+				os.Exit(1)
+			}
+			fileutils.SaveFilesFromJson(blockFinalAnswerDir, []byte(ans.FinalAnswer))
+		}
 	}
 
 	fmt.Println(previousBlockOutput)
@@ -99,7 +109,7 @@ func RunBlock(
 	ctx context.Context,
 	blockData Block,
 	additionalData string,
-	providers map[string]llm.LlmProvider,
+	providers map[string]llm.LLMProvider,
 ) (thinkingblock.ThinkingBlockOutput, error) {
 	provider := providers["openai"]
 
@@ -134,6 +144,7 @@ func RunBlock(
 		ctx,
 		string(blockData.Worker.Prompt),
 		additionalData,
+		blockData.FilesOutput,
 		blockData.Iterations,
 	)
 	if err != nil {
@@ -164,8 +175,8 @@ func SaveBlockAnswer(
 		ansFileName := fileutils.CreateTxtFilename(
 			outputDir,
 			paIdx,
-			blockData.Worker.Name,
-			"answer",
+			"1-"+blockData.Worker.Name,
+			"response",
 		)
 		err := fileutils.WriteToFile(ansFileName, pa.WorkerSolution)
 		if err != nil {
@@ -176,8 +187,8 @@ func SaveBlockAnswer(
 			ansFileName = fileutils.CreateTxtFilename(
 				outputDir,
 				paIdx,
-				blockData.Experts[ean].Name,
-				"answer",
+				"2-"+blockData.Experts[ean].Name,
+				"response",
 			)
 			err = fileutils.WriteToFile(ansFileName, ea)
 			if err != nil {
@@ -185,7 +196,7 @@ func SaveBlockAnswer(
 			}
 		}
 
-		ansFileName = fileutils.CreateTxtFilename(outputDir, paIdx, blockData.Oracle.Name, "answer")
+		ansFileName = fileutils.CreateTxtFilename(outputDir, paIdx, "3-"+blockData.Oracle.Name, "response")
 		err = fileutils.WriteToFile(ansFileName, pa.OracleSummary)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
@@ -196,7 +207,7 @@ func SaveBlockAnswer(
 		promptFileName := fileutils.CreateTxtFilename(
 			outputDir,
 			pIdx,
-			blockData.Worker.Name,
+			"1-"+blockData.Worker.Name,
 			"prompt",
 		)
 		err := fileutils.WriteToFile(promptFileName, p.WorkerPrompt)
@@ -204,7 +215,7 @@ func SaveBlockAnswer(
 			logger.Error("error writing to file", "error", err)
 		}
 
-		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, "experts", "prompt")
+		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, "2-"+"experts", "prompt")
 		err = fileutils.WriteToFile(promptFileName, p.ExpertsPrompt)
 		if err != nil {
 			logger.Error("error writing to file", "error", err)
@@ -213,7 +224,7 @@ func SaveBlockAnswer(
 		promptFileName = fileutils.CreateTxtFilename(
 			outputDir,
 			pIdx,
-			blockData.Oracle.Name,
+			"3-"+blockData.Oracle.Name,
 			"prompt",
 		)
 		err = fileutils.WriteToFile(promptFileName, p.OraclePrompt)
