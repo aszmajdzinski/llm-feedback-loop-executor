@@ -1,3 +1,5 @@
+GO_BIN := $(shell which go)
+
 lint:
 	golangci-lint run --config=golangci.yml ./...
 
@@ -10,7 +12,10 @@ build:
 	go build .
 
 run:
-	go run .
+	$(GO_BIN) run .
 
 test:
 	go test ./...
+
+env:
+	which go
