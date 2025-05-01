@@ -136,7 +136,7 @@ func RunBlock(
 
 	thinkingBlock := thinkingblock.ThinkingBlock{
 		Worker:      worker,
-		ExpertsTeam: agents.ExpertsTeam{Experts: experts},
+		ExpertsTeam: &agents.ExpertsTeam{Experts: experts},
 		Oracle:      oracle,
 	}
 

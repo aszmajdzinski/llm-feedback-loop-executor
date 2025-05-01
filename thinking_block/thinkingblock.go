@@ -66,7 +66,7 @@ type Prompts struct {
 
 type ThinkingBlock struct {
 	Worker      agents.Agent
-	ExpertsTeam agents.ExpertsTeam
+	ExpertsTeam agents.ExpertsTeamInterface
 	Oracle      agents.Agent
 }
 

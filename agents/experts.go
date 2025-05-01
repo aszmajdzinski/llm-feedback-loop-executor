@@ -6,6 +6,10 @@ import (
 	"sync"
 )
 
+type ExpertsTeamInterface interface {
+	Ask(ctx context.Context, prompt string) []ExpertAnswer
+}
+
 type ExpertsTeam struct {
 	Experts []Agent
 }
@@ -15,7 +19,7 @@ type ExpertAnswer struct {
 	Error  error
 }
 
-func (et *ExpertsTeam) Ask(ctx context.Context, msg string) []ExpertAnswer {
+func (et *ExpertsTeam) Ask(ctx context.Context, prompt string) []ExpertAnswer {
 	type result struct {
 		index  int
 		answer string
@@ -30,7 +34,7 @@ func (et *ExpertsTeam) Ask(ctx context.Context, msg string) []ExpertAnswer {
 
 		go func(index int, agent Agent) {
 			defer wg.Done()
-			ans, err := agent.Chat(ctx, msg)
+			ans, err := agent.Chat(ctx, prompt)
 			if err != nil {
 				ch <- result{
 					index: index,
