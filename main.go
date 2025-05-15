@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"example.com/web-app-creator/agents"
+	"example.com/web-app-creator/assistants"
 	fileutils "example.com/web-app-creator/file_utils"
 	"example.com/web-app-creator/llm"
 	loggerutils "example.com/web-app-creator/logger_utils"
@@ -117,11 +117,11 @@ func RunBlock(
 ) (thinkingblock.ThinkingBlockOutput, error) {
 	provider := providers["openai"]
 
-	worker, experts, oracle := createAgents(blockData, provider)
+	worker, experts, oracle := createAssistants(blockData, provider)
 
 	thinkingBlock := thinkingblock.ThinkingBlock{
 		Worker:      worker,
-		ExpertsTeam: &agents.ExpertsTeam{Experts: experts},
+		ExpertsTeam: &assistants.ExpertsTeam{Experts: experts},
 		Oracle:      oracle,
 	}
 
@@ -149,15 +149,15 @@ func createProviders() map[string]llm.LLMProvider {
 	}
 }
 
-func createAgents(blockData Block, provider llm.LLMProvider) (worker agents.Agent, experts []agents.Agent, oracle agents.Agent) {
-	worker = agents.Agent{
+func createAssistants(blockData Block, provider llm.LLMProvider) (worker assistants.Assistant, experts []assistants.Assistant, oracle assistants.Assistant) {
+	worker = assistants.Assistant{
 		Name:         blockData.Worker.Name,
 		SystemPrompt: blockData.Worker.System,
 		Llm:          provider,
 	}
 
 	for _, a := range blockData.Experts {
-		experts = append(experts, agents.Agent{
+		experts = append(experts, assistants.Assistant{
 			Name:         a.Name,
 			SystemPrompt: a.System,
 			Llm:          provider,
@@ -165,7 +165,7 @@ func createAgents(blockData Block, provider llm.LLMProvider) (worker agents.Agen
 		)
 	}
 
-	oracle = agents.Agent{
+	oracle = assistants.Assistant{
 		Name: blockData.Oracle.Name,
 		Llm:  provider,
 	}

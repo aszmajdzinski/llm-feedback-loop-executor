@@ -1,4 +1,4 @@
-package agents
+package assistants
 
 import (
 	"context"
@@ -11,7 +11,7 @@ type ExpertsTeamInterface interface {
 }
 
 type ExpertsTeam struct {
-	Experts []Agent
+	Experts []Assistant
 }
 
 type ExpertAnswer struct {
@@ -32,13 +32,13 @@ func (et *ExpertsTeam) Ask(ctx context.Context, prompt string) []ExpertAnswer {
 	for i, a := range et.Experts {
 		wg.Add(1)
 
-		go func(index int, agent Agent) {
+		go func(index int, assistant Assistant) {
 			defer wg.Done()
-			ans, err := agent.Chat(ctx, prompt)
+			ans, err := assistant.Chat(ctx, prompt)
 			if err != nil {
 				ch <- result{
 					index: index,
-					error: fmt.Errorf("cannot get response from agent %s: %w", agent.Name, err),
+					error: fmt.Errorf("cannot get response from chat %s: %w", assistant.Name, err),
 				}
 				return
 			}

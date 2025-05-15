@@ -1,4 +1,4 @@
-package agents
+package assistants
 
 import (
 	"context"
@@ -7,13 +7,13 @@ import (
 	"example.com/web-app-creator/llm"
 )
 
-type Agent struct {
+type Assistant struct {
 	Name         string
 	SystemPrompt string
 	Llm          llm.LLMProvider
 }
 
-func (a Agent) Chat(ctx context.Context, msg string) (string, error) {
+func (a Assistant) Chat(ctx context.Context, msg string) (string, error) {
 	s := llm.ChatMessage{Role: "developer", Content: a.SystemPrompt}
 	m := llm.ChatMessage{Role: "user", Content: msg}
 
@@ -30,7 +30,7 @@ func (a Agent) Chat(ctx context.Context, msg string) (string, error) {
 	return ans.Response, nil
 }
 
-func (a Agent) StructuredChat(ctx context.Context, msg string, name string, schema map[string]any) (string, error) {
+func (a Assistant) StructuredChat(ctx context.Context, msg string, name string, schema map[string]any) (string, error) {
 	l, ok := a.Llm.(llm.StructuredLLMProvider)
 	if !ok {
 		return "", errors.New("selected model does not support structured responses")

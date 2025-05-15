@@ -1,8 +1,7 @@
-package agents
+package assistants
 
 import "context"
 
-// MockExpertsTeam is a mock implementation of ExpertsTeamInterface.
 type MockExpertsTeam struct {
 	AskFunc func(ctx context.Context, prompt string) []ExpertAnswer
 }

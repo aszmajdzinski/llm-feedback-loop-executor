@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"example.com/web-app-creator/agents"
+	"example.com/web-app-creator/assistants"
 	"example.com/web-app-creator/llm"
 )
 
 func TestThinkingBlock_Run(t *testing.T) {
-	// Mock Worker Agent
+	// Mock Worker Assistant
 	mockWorker := &llm.MockLLMProvider{
 		GetCompletionFunc: func(ctx context.Context, req llm.ChatRequest) (llm.ChatResponse, error) {
 			return llm.ChatResponse{Response: "Worker solution"}, nil
@@ -17,16 +17,16 @@ func TestThinkingBlock_Run(t *testing.T) {
 	}
 
 	// Mock ExpertsTeam
-	mockExpertsTeam := agents.MockExpertsTeam{
-		AskFunc: func(ctx context.Context, prompt string) []agents.ExpertAnswer {
-			return []agents.ExpertAnswer{
+	mockExpertsTeam := assistants.MockExpertsTeam{
+		AskFunc: func(ctx context.Context, prompt string) []assistants.ExpertAnswer {
+			return []assistants.ExpertAnswer{
 				{Answer: "Expert review 1", Error: nil},
 				{Answer: "Expert review 2", Error: nil},
 			}
 		},
 	}
 
-	// Mock Oracle Agent
+	// Mock Oracle Assistant
 	mockOracle := &llm.MockLLMProvider{
 		GetCompletionFunc: func(ctx context.Context, req llm.ChatRequest) (llm.ChatResponse, error) {
 			if req.BaseChatRequest.Messages[0].Content == "OK" {
@@ -38,14 +38,14 @@ func TestThinkingBlock_Run(t *testing.T) {
 
 	// Create ThinkingBlock with mocks
 	tb := ThinkingBlock{
-		Worker: agents.Agent{
-			Name:         "WorkerAgent",
+		Worker: assistants.Assistant{
+			Name:         "WorkerAssistant",
 			SystemPrompt: "Worker prompt",
 			Llm:          mockWorker,
 		},
 		ExpertsTeam: &mockExpertsTeam,
-		Oracle: agents.Agent{
-			Name:         "OracleAgent",
+		Oracle: assistants.Assistant{
+			Name:         "OracleAssistant",
 			SystemPrompt: "Oracle prompt",
 			Llm:          mockOracle,
 		},

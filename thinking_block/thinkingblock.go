@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"example.com/web-app-creator/agents"
+	"example.com/web-app-creator/assistants"
 	loggerutils "example.com/web-app-creator/logger_utils"
 )
 
@@ -65,9 +65,9 @@ type Prompts struct {
 }
 
 type ThinkingBlock struct {
-	Worker      agents.Agent
-	ExpertsTeam agents.ExpertsTeamInterface
-	Oracle      agents.Agent
+	Worker      assistants.Assistant
+	ExpertsTeam assistants.ExpertsTeamInterface
+	Oracle      assistants.Assistant
 }
 
 func (tb *ThinkingBlock) Run(
@@ -266,10 +266,10 @@ var schema = map[string]any{
 	"additionalProperties": false,
 }
 
-func chat(ctx context.Context, agent agents.Agent, msg string, schema *map[string]any) (string, error) {
+func chat(ctx context.Context, assistant assistants.Assistant, msg string, schema *map[string]any) (string, error) {
 	if schema != nil {
-		return agent.StructuredChat(ctx, msg, agent.Name, *schema)
+		return assistant.StructuredChat(ctx, msg, assistant.Name, *schema)
 	} else {
-		return agent.Chat(ctx, msg)
+		return assistant.Chat(ctx, msg)
 	}
 }
