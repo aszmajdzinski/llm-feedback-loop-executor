@@ -9,13 +9,13 @@ format:
 	golines -m 100 -w .
 	
 build:
-	go build .
+	$(GO_BIN) build .
 
 run:
-	$(GO_BIN) run .
+	$(GO_BIN) run . -config example-configuration.yaml
 
 test:
-	go test ./...
+	$(GO_BIN) test ./...
 
 env:
 	which go
