@@ -1,13 +1,14 @@
 blocks:
   - name: app-design
-    iterations: 1
+    iterations: 2
     filesOutput: true
     worker:
       name: python-application-designer
       system: >
         You are a python developer.
-      prompt: Create a simple app that has a main.py and few folder with .py files. Those files
-              should be imported in main.py. 
+      prompt: >
+        Create a simple app that has a main.py and few folder with .py files. Those files
+        should be imported in main.py. 
 
     experts:
       - name: senior-python-developer
@@ -16,7 +17,31 @@ blocks:
 
       - name: senior-software-developer
         system: >
+          You are a fullstack senior developer who write short but informative code reviews.
 
     oracle:
       name: Oracle
       system: ""
+
+  - name: documentation
+    iterations: 2
+    filesOutput: true
+    worker:
+      name: technical-writer
+      system: >
+        You are a technical writer who understands python very well. You are able to write readme
+        files that informs user about a given application structure and technology as well as
+        to use it.
+      prompt: >
+        You will be given python files combined into a json file (where key is a file name and
+        values are content of a file). Please take a look at it, try to reason what is it for and
+        how it works. Write an exhaustive readme file. Please provide one file, also put in a json
+        format.
+      experts:
+        - name: docs-reviewer
+          system: >
+            You are an expert in technical writing. You use your rich expierience to help others
+            with their job. You provide deep reviews.
+      oracle:
+        - name: Documentation Oracle
+        - system: ""
