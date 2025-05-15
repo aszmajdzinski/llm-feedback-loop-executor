@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -44,33 +45,40 @@ func main() {
 	ctx := context.TODO()
 	ctx = loggerutils.WithLogger(ctx, logger)
 
-	data, err := os.ReadFile("system_prompts.yaml")
-	if err != nil {
-		log.Fatalf("error reading prompts file: %v", err)
+	appSetupFile := flag.String("config", "", "Path to the app setup file")
+	flag.Parse()
+
+	if *appSetupFile == "" {
+		log.Fatalf("usage: %s -config <app setup file>", os.Args[0])
 	}
 
-	var appSetup AppSetup
-	err = yaml.Unmarshal(data, &appSetup)
+	appSetup, err := getAppData(*appSetupFile)
 	if err != nil {
-		log.Fatalf("failed unmarshaling yaml: %v", err)
+		log.Fatalf("failed loading app setup file: %v", err)
 	}
 
-	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
-	providers := map[string]llm.LLMProvider{
-		"openai": llm.NewOpenAIWithStructuredOutputProvider(openAIAPIKey, "gpt-4o-mini", ""),
+	providers := createProviders()
+
+	err = RunApp(ctx, appSetup, providers)
+	if err != nil {
+		log.Fatal(err.Error())
 	}
+}
+
+func RunApp(ctx context.Context, appSetup AppSetup, providers map[string]llm.LLMProvider) error {
 
 	previousBlockOutput := ""
 	for bn, b := range appSetup.Blocks {
+		logger := loggerutils.GetLogger(ctx)
+
 		logger.Info("Running block", "name", b.Name)
 
 		ans, err := RunBlock(ctx, b, previousBlockOutput, providers)
 		if err != nil {
-			logger.Error("error running block", "block", b.Name, "error", err)
-			os.Exit(1)
+			return fmt.Errorf("error running block %s: %s", b.Name, err.Error())
 		}
-		logger.Debug(
-			"Finished running block", "block name", b.Name)
+
+		previousBlockOutput = ans.FinalAnswer
 
 		partialOutputsDir := filepath.Join(
 			os.Getenv("OUTPUT_DIRECTORY"),
@@ -80,11 +88,8 @@ func main() {
 
 		err = SaveBlockAnswer(ctx, partialOutputsDir, b, ans)
 		if err != nil {
-			logger.Error("Error saving block answer", "block", b.Name, "error", err)
-			os.Exit(1)
+			return fmt.Errorf("error saving block %s: %s", b.Name, err.Error())
 		}
-
-		previousBlockOutput = ans.FinalAnswer
 
 		blockFinalAnswerDir := filepath.Join(
 			os.Getenv("OUTPUT_DIRECTORY"),
@@ -95,14 +100,13 @@ func main() {
 		if b.FilesOutput {
 			err = os.MkdirAll(blockFinalAnswerDir, 0o755)
 			if err != nil {
-				logger.Error("Error creating block answer directory", "error", err)
-				os.Exit(1)
+				return fmt.Errorf("error creating block answer directory %s: %s", b.Name, err.Error())
+
 			}
 			fileutils.SaveFilesFromJson(blockFinalAnswerDir, []byte(ans.FinalAnswer))
 		}
 	}
-
-	fmt.Println(previousBlockOutput)
+	return nil
 }
 
 func RunBlock(
@@ -113,26 +117,7 @@ func RunBlock(
 ) (thinkingblock.ThinkingBlockOutput, error) {
 	provider := providers["openai"]
 
-	worker := agents.Agent{
-		Name:         blockData.Worker.Name,
-		SystemPrompt: blockData.Worker.System,
-		Llm:          provider,
-	}
-
-	var experts []agents.Agent
-	for _, a := range blockData.Experts {
-		experts = append(experts, agents.Agent{
-			Name:         a.Name,
-			SystemPrompt: a.System,
-			Llm:          provider,
-		},
-		)
-	}
-
-	oracle := agents.Agent{
-		Name: blockData.Oracle.Name,
-		Llm:  provider,
-	}
+	worker, experts, oracle := createAgents(blockData, provider)
 
 	thinkingBlock := thinkingblock.ThinkingBlock{
 		Worker:      worker,
@@ -157,6 +142,37 @@ func RunBlock(
 	return out, nil
 }
 
+func createProviders() map[string]llm.LLMProvider {
+	openAIAPIKey := os.Getenv("OPENAI_API_KEY")
+	return map[string]llm.LLMProvider{
+		"openai": llm.NewOpenAIWithStructuredOutputProvider(openAIAPIKey, "gpt-4o-mini", ""),
+	}
+}
+
+func createAgents(blockData Block, provider llm.LLMProvider) (worker agents.Agent, experts []agents.Agent, oracle agents.Agent) {
+	worker = agents.Agent{
+		Name:         blockData.Worker.Name,
+		SystemPrompt: blockData.Worker.System,
+		Llm:          provider,
+	}
+
+	for _, a := range blockData.Experts {
+		experts = append(experts, agents.Agent{
+			Name:         a.Name,
+			SystemPrompt: a.System,
+			Llm:          provider,
+		},
+		)
+	}
+
+	oracle = agents.Agent{
+		Name: blockData.Oracle.Name,
+		Llm:  provider,
+	}
+
+	return
+}
+
 func SaveBlockAnswer(
 	ctx context.Context,
 	outputDir string,
@@ -171,6 +187,38 @@ func SaveBlockAnswer(
 		return err
 	}
 
+	// save all prompts
+	for pIdx, p := range answer.Prompts {
+		promptFileName := fileutils.CreateTxtFilename(
+			outputDir,
+			pIdx,
+			"1-"+blockData.Worker.Name,
+			"prompt",
+		)
+		err := fileutils.WriteToFile(promptFileName, p.WorkerPrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+
+		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, "2-"+"experts", "prompt")
+		err = fileutils.WriteToFile(promptFileName, p.ExpertsPrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+
+		promptFileName = fileutils.CreateTxtFilename(
+			outputDir,
+			pIdx,
+			"3-"+blockData.Oracle.Name,
+			"prompt",
+		)
+		err = fileutils.WriteToFile(promptFileName, p.OraclePrompt)
+		if err != nil {
+			logger.Error("error writing to file", "error", err)
+		}
+	}
+
+	// save all responses
 	for paIdx, pa := range answer.PartAnswers {
 		ansFileName := fileutils.CreateTxtFilename(
 			outputDir,
@@ -203,35 +251,20 @@ func SaveBlockAnswer(
 		}
 	}
 
-	for pIdx, p := range answer.Prompts {
-		promptFileName := fileutils.CreateTxtFilename(
-			outputDir,
-			pIdx,
-			"1-"+blockData.Worker.Name,
-			"prompt",
-		)
-		err := fileutils.WriteToFile(promptFileName, p.WorkerPrompt)
-		if err != nil {
-			logger.Error("error writing to file", "error", err)
-		}
+	return nil
+}
 
-		promptFileName = fileutils.CreateTxtFilename(outputDir, pIdx, "2-"+"experts", "prompt")
-		err = fileutils.WriteToFile(promptFileName, p.ExpertsPrompt)
-		if err != nil {
-			logger.Error("error writing to file", "error", err)
-		}
-
-		promptFileName = fileutils.CreateTxtFilename(
-			outputDir,
-			pIdx,
-			"3-"+blockData.Oracle.Name,
-			"prompt",
-		)
-		err = fileutils.WriteToFile(promptFileName, p.OraclePrompt)
-		if err != nil {
-			logger.Error("error writing to file", "error", err)
-		}
+func getAppData(file string) (AppSetup, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return AppSetup{}, fmt.Errorf("error reading file %s: %v", file, err)
 	}
 
-	return nil
+	var appSetup AppSetup
+	err = yaml.Unmarshal(data, &appSetup)
+	if err != nil {
+		return AppSetup{}, fmt.Errorf("failed unmarshaling yaml: %v", err)
+	}
+
+	return appSetup, nil
 }
