@@ -66,7 +66,6 @@ func main() {
 }
 
 func RunApp(ctx context.Context, appSetup AppSetup, providers map[string]llm.LLMProvider) error {
-
 	previousBlockOutput := ""
 	for bn, b := range appSetup.Blocks {
 		logger := loggerutils.GetLogger(ctx)
@@ -103,7 +102,10 @@ func RunApp(ctx context.Context, appSetup AppSetup, providers map[string]llm.LLM
 				return fmt.Errorf("error creating block answer directory %s: %s", b.Name, err.Error())
 
 			}
-			fileutils.SaveFilesFromJson(blockFinalAnswerDir, []byte(ans.FinalAnswer))
+			err = fileutils.SaveFilesFromJson(blockFinalAnswerDir, []byte(ans.FinalAnswer))
+			if err != nil {
+				return fmt.Errorf("error saving output files: %s", err.Error())
+			}
 		}
 	}
 	return nil
