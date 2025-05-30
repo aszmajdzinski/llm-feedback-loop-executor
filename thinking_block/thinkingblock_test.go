@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"example.com/web-app-creator/assistants"
-	"example.com/web-app-creator/llm"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/assistants"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/llm"
 )
 
 func TestThinkingBlock_Run(t *testing.T) {

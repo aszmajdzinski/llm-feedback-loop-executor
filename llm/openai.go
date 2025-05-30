@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	loggerutils "example.com/web-app-creator/logger_utils"
+	loggerutils "github.com/aszmajdzinski/llm-feedback-loop-executor/logger_utils"
 )
 
 const (

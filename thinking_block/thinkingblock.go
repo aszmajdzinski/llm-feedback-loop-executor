@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"example.com/web-app-creator/assistants"
-	loggerutils "example.com/web-app-creator/logger_utils"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/assistants"
+	loggerutils "github.com/aszmajdzinski/llm-feedback-loop-executor/logger_utils"
 )
 
 const initialWorkerPrompt string = "You will be given a TASK. " +

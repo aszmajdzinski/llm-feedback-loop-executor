@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"example.com/web-app-creator/llm"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/llm"
 )
 
 func TestAssistantChat(t *testing.T) {

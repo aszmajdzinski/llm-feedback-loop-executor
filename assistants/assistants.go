@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"example.com/web-app-creator/llm"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/llm"
 )
 
 type Assistant struct {

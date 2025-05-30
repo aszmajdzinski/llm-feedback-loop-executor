@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"example.com/web-app-creator/assistants"
-	fileutils "example.com/web-app-creator/file_utils"
-	"example.com/web-app-creator/llm"
-	loggerutils "example.com/web-app-creator/logger_utils"
-	thinkingblock "example.com/web-app-creator/thinking_block"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/assistants"
+	fileutils "github.com/aszmajdzinski/llm-feedback-loop-executor/file_utils"
+	"github.com/aszmajdzinski/llm-feedback-loop-executor/llm"
+	loggerutils "github.com/aszmajdzinski/llm-feedback-loop-executor/logger_utils"
+	thinkingblock "github.com/aszmajdzinski/llm-feedback-loop-executor/thinking_block"
 	_ "github.com/joho/godotenv/autoload"
 	"gopkg.in/yaml.v3"
 )
